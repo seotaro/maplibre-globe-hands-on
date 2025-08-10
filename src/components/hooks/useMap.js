@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 
+import { makeGraticuleGeoJson } from '../../utils'
+
 export const useMap = (options = {}) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -31,16 +33,32 @@ export const useMap = (options = {}) => {
         type: 'globe',
       });
 
+      // 緯度経度線 
+      {
+        map.current.addSource('graticule', { type: 'geojson', data: makeGraticuleGeoJson });
+
+        map.current.addLayer({
+          id: 'graticule-lines',
+          type: 'line',
+          source: 'graticule',
+          paint: {
+            'line-color': '#F00',
+            'line-width': 1,
+            'line-opacity': 0.5,
+          }
+        });
+      }
+
       // イメージをマッピングする
       {
         map.current.addSource('image1', {
           type: 'image',
           url: 'image.png',
           coordinates: [
-            [135.0, 40.0], // left top     : west north
-            [145.0, 40.0], // right top    : east north
-            [145.0, 35.0], // right bottom : east south
-            [135.0, 35.0]  // left bottom  : west south
+            [130.0, 40.0], // left top     : west north
+            [150.0, 40.0], // right top    : east north
+            [150.0, 30.0], // right bottom : east south
+            [130.0, 30.0]  // left bottom  : west south
           ]
         });
 
@@ -60,10 +78,10 @@ export const useMap = (options = {}) => {
           type: 'image',
           url: 'image.png',
           coordinates: [
-            [135.0, 80.0], // left top     : west north
-            [145.0, 80.0], // right top    : east north
-            [145.0, 70.0], // right bottom : east south
-            [135.0, 70.0]  // left bottom  : west south
+            [130.0, 80.0], // left top     : west north
+            [150.0, 80.0], // right top    : east north
+            [150.0, 70.0], // right bottom : east south
+            [130.0, 70.0]  // left bottom  : west south
           ]
         });
 
@@ -84,10 +102,10 @@ export const useMap = (options = {}) => {
           type: 'image',
           url: 'image.png',
           coordinates: [
-            [135.0, 60.0], // left top     : west north
-            [145.0, 60.0], // right top    : east north
-            [145.0, 50.0], // right bottom : east south
-            [135.0, 50.0]  // left bottom  : west south
+            [130.0, 60.0], // left top     : west north
+            [150.0, 60.0], // right top    : east north
+            [150.0, 50.0], // right bottom : east south
+            [130.0, 50.0]  // left bottom  : west south
           ]
         });
 
