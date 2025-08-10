@@ -72,9 +72,9 @@ export const useMap = (options = {}) => {
         const shader = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
-        const log = gl.getShaderInfoLog(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-          console.error('Vertex shader compile error:', log);
+          console.error('Vertex shader compile error:', gl.getShaderInfoLog(shader));
+          return null;
         }
         gl.attachShader(program, shader);
       }
@@ -93,9 +93,9 @@ export const useMap = (options = {}) => {
         const shader = gl.createShader(gl.FRAGMENT_SHADER);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
-        const log = gl.getShaderInfoLog(shader);
-        if (log) {
-          console.error('Fragment shader compile error:', log);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error('Fragment shader compile error:', gl.getShaderInfoLog(shader));
+          return null;
         }
         gl.attachShader(program, shader);
       }
