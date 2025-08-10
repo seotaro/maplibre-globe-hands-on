@@ -87,7 +87,7 @@ export const useMap = (options = {}) => {
             in vec3 vColor;
             out highp vec4 fragColor;
             void main() {
-                fragColor = vec4(vColor, 0.75);
+                fragColor = vec4(vColor, 0.9);
             }`;
 
         const shader = gl.createShader(gl.FRAGMENT_SHADER);
@@ -101,6 +101,10 @@ export const useMap = (options = {}) => {
       }
 
       gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return null;
+      }
 
       this.aPosition = gl.getAttribLocation(program, 'a_position');
       this.aColor = gl.getAttribLocation(program, 'a_color');
@@ -125,6 +129,10 @@ export const useMap = (options = {}) => {
         lng: 145.0,
         lat: 55.0
       });
+      const p4 = maplibregl.MercatorCoordinate.fromLngLat({
+        lng: 155.0,
+        lat: 45.0
+      });
 
       // create and initialize a WebGLBuffer to store vertex and color data
       this.buffer = gl.createBuffer();
@@ -135,7 +143,8 @@ export const useMap = (options = {}) => {
           // x, y, r, g, b
           p1.x, p1.y, 1.0, 0.0, 0.0,
           p2.x, p2.y, 0.0, 1.0, 0.0,
-          p3.x, p3.y, 0.0, 0.0, 1.0
+          p3.x, p3.y, 0.0, 0.0, 1.0,
+          p4.x, p4.y, 1.0, 1.0, 0.0,
         ]),
         gl.STATIC_DRAW
       );
@@ -188,7 +197,6 @@ export const useMap = (options = {}) => {
         args.defaultProjectionData.projectionTransition
       );
 
-
       const stride = (2 + 3) * 4; // float * 5
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
@@ -199,7 +207,7 @@ export const useMap = (options = {}) => {
 
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };
 
