@@ -5,12 +5,11 @@ import { useMap } from './hooks/useMap';
 // 使用例コンポーネント
 export const Map = () => {
   const { mapContainer, isLoaded } = useMap({
-    zoom: 10, center: [139.6917, 35.6895]
   });
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '500px' }}>
-      <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
+    <div className="relative w-full h-full flex">
+      <div ref={mapContainer} className="flex-1 relative" />
 
       {/* ローディング表示 */}
       {!isLoaded && (

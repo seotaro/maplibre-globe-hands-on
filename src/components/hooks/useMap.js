@@ -8,9 +8,9 @@ export const useMap = (options = {}) => {
 
   // デフォルトオプション
   const defaultOptions = {
-    style: 'std.json',
+    style: 'https://demotiles.maplibre.org/style.json',
     center: [139.6917, 35.6895], // 東京駅
-    zoom: 12,
+    zoom: 3,
     ...options
   };
 
@@ -26,6 +26,11 @@ export const useMap = (options = {}) => {
     // マップロード完了イベント
     map.current.on('load', () => {
       setIsLoaded(true);
+
+      map.current.setProjection({
+        type: 'globe',
+      });
+
     });
 
     // クリーンアップ
@@ -35,17 +40,6 @@ export const useMap = (options = {}) => {
       }
     };
   }, []);
-
-  // マーカー追加メソッド
-  const addMarker = (lngLat, options = {}) => {
-    if (!map.current) return null;
-
-    const marker = new maplibregl.Marker(options)
-      .setLngLat(lngLat)
-      .addTo(map.current);
-
-    return marker;
-  };
 
   // 中心座標移動メソッド
   const flyTo = (center, zoom = null) => {
@@ -71,7 +65,6 @@ export const useMap = (options = {}) => {
     mapContainer,
     map: map.current,
     isLoaded,
-    addMarker,
     flyTo,
     getCenter,
     getZoom
