@@ -49,22 +49,39 @@ export const useMap = (options = {}) => {
       // We simply use string interpolation for that here.
       //
       // See MapLibre source code for more details, especially src/shaders/_projection_globe.vertex.glsl
-      const vertexSource = `#version 300 es
-            // Inject MapLibre projection code
-            ${shaderDescription.vertexShaderPrelude}
-            ${shaderDescription.define}
 
-            in vec2 a_position;
-            in vec3 a_color;
-            out vec3 vColor;
+      // link the two shaders into a WebGL program
+      const program = gl.createProgram();
 
-            void main() {
-                gl_Position = projectTile(a_position);
-                vColor = a_color;
-            }`;
+      // create a vertex shader
+      {
+        const source = `#version 300 es
+              // Inject MapLibre projection code
+              ${shaderDescription.vertexShaderPrelude}
+              ${shaderDescription.define}
+  
+              in vec2 a_position;
+              in vec3 a_color;
+              out vec3 vColor;
+  
+              void main() {
+                  gl_Position = projectTile(a_position);
+                  vColor = a_color;
+              }`;
 
-      // create GLSL source for fragment shader
-      const fragmentSource = `#version 300 es
+        const shader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        const log = gl.getShaderInfoLog(shader);
+        if (log) {
+          console.error('Vertex shader compile error:', log);
+        }
+        gl.attachShader(program, shader);
+      }
+
+      // create a fragment shader
+      {
+        const source = `#version 300 es
             precision mediump float;
 
             in vec3 vColor;
@@ -73,32 +90,16 @@ export const useMap = (options = {}) => {
                 fragColor = vec4(vColor, 0.75);
             }`;
 
-      // create a vertex shader
-      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-      gl.shaderSource(vertexShader, vertexSource);
-      gl.compileShader(vertexShader);
-      {
-        const log = gl.getShaderInfoLog(vertexShader);
-        if (log) {
-          console.error('Vertex shader compile error:', log);
-        }
-      }
-
-      // create a fragment shader
-      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-      gl.shaderSource(fragmentShader, fragmentSource);
-      gl.compileShader(fragmentShader);
-      {
-        const log = gl.getShaderInfoLog(fragmentShader);
+        const shader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        const log = gl.getShaderInfoLog(shader);
         if (log) {
           console.error('Fragment shader compile error:', log);
         }
+        gl.attachShader(program, shader);
       }
 
-      // link the two shaders into a WebGL program
-      const program = gl.createProgram();
-      gl.attachShader(program, vertexShader);
-      gl.attachShader(program, fragmentShader);
       gl.linkProgram(program);
 
       this.aPosition = gl.getAttribLocation(program, 'a_position');
