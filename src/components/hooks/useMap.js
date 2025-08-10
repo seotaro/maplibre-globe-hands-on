@@ -54,12 +54,12 @@ export const useMap = (options = {}) => {
             ${shaderDescription.vertexShaderPrelude}
             ${shaderDescription.define}
 
-            in vec2 a_pos;
+            in vec2 a_position;
             in vec3 a_color;
             out vec3 vColor;
 
             void main() {
-                gl_Position = projectTile(a_pos);
+                gl_Position = projectTile(a_position);
                 vColor = a_color;
             }`;
 
@@ -101,7 +101,7 @@ export const useMap = (options = {}) => {
       gl.attachShader(program, fragmentShader);
       gl.linkProgram(program);
 
-      this.aPos = gl.getAttribLocation(program, 'a_pos');
+      this.aPosition = gl.getAttribLocation(program, 'a_position');
       this.aColor = gl.getAttribLocation(program, 'a_color');
       this.shaderMap.set(shaderDescription.variantName, program);
 
@@ -191,8 +191,8 @@ export const useMap = (options = {}) => {
       const stride = (2 + 3) * 4; // float * 5
 
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      gl.enableVertexAttribArray(this.aPos);
-      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, stride, 0);
+      gl.enableVertexAttribArray(this.aPosition);
+      gl.vertexAttribPointer(this.aPosition, 2, gl.FLOAT, false, stride, 0);
       gl.enableVertexAttribArray(this.aColor);
       gl.vertexAttribPointer(this.aColor, 3, gl.FLOAT, false, stride, 2 * 4);
 
