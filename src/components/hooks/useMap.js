@@ -49,42 +49,65 @@ export const useMap = (options = {}) => {
       // We simply use string interpolation for that here.
       //
       // See MapLibre source code for more details, especially src/shaders/_projection_globe.vertex.glsl
-      const vertexSource = `#version 300 es
-            // Inject MapLibre projection code
-            ${shaderDescription.vertexShaderPrelude}
-            ${shaderDescription.define}
-
-            in vec2 a_pos;
-
-            void main() {
-                gl_Position = projectTile(a_pos);
-            }`;
-
-      // create GLSL source for fragment shader
-      const fragmentSource = `#version 300 es
-
-            out highp vec4 fragColor;
-            void main() {
-                fragColor = vec4(1.0, 0.0, 0.0, 0.75);
-            }`;
-
-      // create a vertex shader
-      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-      gl.shaderSource(vertexShader, vertexSource);
-      gl.compileShader(vertexShader);
-
-      // create a fragment shader
-      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-      gl.shaderSource(fragmentShader, fragmentSource);
-      gl.compileShader(fragmentShader);
 
       // link the two shaders into a WebGL program
       const program = gl.createProgram();
-      gl.attachShader(program, vertexShader);
-      gl.attachShader(program, fragmentShader);
-      gl.linkProgram(program);
 
-      this.aPos = gl.getAttribLocation(program, 'a_pos');
+      // create a vertex shader
+      {
+        const source = `#version 300 es
+              // Inject MapLibre projection code
+              ${shaderDescription.vertexShaderPrelude}
+              ${shaderDescription.define}
+  
+              in vec2 a_position;
+              in vec3 a_color;
+              out vec3 vColor;
+  
+              void main() {
+                  gl_Position = projectTile(a_position);
+                  vColor = a_color;
+              }`;
+
+        const shader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error('Vertex shader compile error:', gl.getShaderInfoLog(shader));
+          return null;
+        }
+        gl.attachShader(program, shader);
+      }
+
+      // create a fragment shader
+      {
+        const source = `#version 300 es
+            precision mediump float;
+
+            in vec3 vColor;
+            out highp vec4 fragColor;
+            void main() {
+                fragColor = vec4(vColor, 0.9);
+            }`;
+
+        const shader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error('Fragment shader compile error:', gl.getShaderInfoLog(shader));
+          return null;
+        }
+        gl.attachShader(program, shader);
+      }
+
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return null;
+      }
+
+      this.aPosition = gl.getAttribLocation(program, 'a_position');
+      this.aColor = gl.getAttribLocation(program, 'a_color');
       this.shaderMap.set(shaderDescription.variantName, program);
 
       return program;
@@ -106,6 +129,10 @@ export const useMap = (options = {}) => {
         lng: 145.0,
         lat: 55.0
       });
+      const p4 = maplibregl.MercatorCoordinate.fromLngLat({
+        lng: 155.0,
+        lat: 45.0
+      });
 
       // create and initialize a WebGLBuffer to store vertex and color data
       this.buffer = gl.createBuffer();
@@ -113,9 +140,11 @@ export const useMap = (options = {}) => {
       gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array([
-          p1.x, p1.y,
-          p2.x, p2.y,
-          p3.x, p3.y,
+          // x, y, r, g, b
+          p1.x, p1.y, 1.0, 0.0, 0.0,
+          p2.x, p2.y, 0.0, 1.0, 0.0,
+          p3.x, p3.y, 0.0, 0.0, 1.0,
+          p4.x, p4.y, 1.0, 1.0, 0.0,
         ]),
         gl.STATIC_DRAW
       );
@@ -168,12 +197,17 @@ export const useMap = (options = {}) => {
         args.defaultProjectionData.projectionTransition
       );
 
+      const stride = (2 + 3) * 4; // float * 5
+
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-      gl.enableVertexAttribArray(this.aPos);
-      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(this.aPosition);
+      gl.vertexAttribPointer(this.aPosition, 2, gl.FLOAT, false, stride, 0);
+      gl.enableVertexAttribArray(this.aColor);
+      gl.vertexAttribPointer(this.aColor, 3, gl.FLOAT, false, stride, 2 * 4);
+
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
   };
 
