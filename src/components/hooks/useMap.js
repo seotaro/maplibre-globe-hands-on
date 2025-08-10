@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import maplibregl, { MercatorCoordinate } from 'maplibre-gl';
 
 import { makeGraticuleGeoJson } from '../../utils'
 
@@ -14,6 +14,167 @@ export const useMap = (options = {}) => {
     center: [139.6917, 35.6895], // 東京駅
     zoom: 3,
     ...options
+  };
+
+  // create a custom style layer to implement the WebGL content
+  const customLayer = {
+    id: 'customLayer',
+    type: 'custom',
+    shaderMap: new Map(),
+
+    // Helper method for creating a shader based on current map projection - globe will automatically switch to mercator when some condition is fulfilled.
+    getShader(gl, shaderDescription) {
+      // Pick a shader based on the current projection, defined by `variantName`.
+      if (this.shaderMap.has(shaderDescription.variantName)) {
+        return this.shaderMap.get(shaderDescription.variantName);
+      }
+
+      // Create GLSL source for vertex shader
+      //
+      // Note that we need to use a complex function to project from the source mercator
+      // coordinates to the globe. Internal shaders in MapLibre need to do this too.
+      // This is done using the `projectTile` function.
+      // In MapLibre, this function accepts vertex coordinates local to the current tile,
+      // in range 0..EXTENT (8192), but for custom layers MapLibre supplies uniforms such that
+      // the function accepts mercator coordinates of the whole world in range 0..1.
+      // This is controlled by the `u_projection_tile_mercator_coords` uniform.
+      //
+      // The `projectTile` function can also handle mercator to globe transitions and can
+      // handle the mercator projection - different code is supplied based on what projection is used,
+      // and for this reason we use different shaders based on what shader projection variant is currently used.
+      // See `variantName` usage earlier in this file.
+      //
+      // The code for the projection function and uniforms is also supplied by MapLibre
+      // and must be injected into custom layer shaders in order to draw on a globe.
+      // We simply use string interpolation for that here.
+      //
+      // See MapLibre source code for more details, especially src/shaders/_projection_globe.vertex.glsl
+      const vertexSource = `#version 300 es
+            // Inject MapLibre projection code
+            ${shaderDescription.vertexShaderPrelude}
+            ${shaderDescription.define}
+
+            in vec2 a_pos;
+
+            void main() {
+                gl_Position = projectTile(a_pos);
+            }`;
+
+      // create GLSL source for fragment shader
+      const fragmentSource = `#version 300 es
+
+            out highp vec4 fragColor;
+            void main() {
+                fragColor = vec4(1.0, 0.0, 0.0, 0.75);
+            }`;
+
+      // create a vertex shader
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertexShader, vertexSource);
+      gl.compileShader(vertexShader);
+
+      // create a fragment shader
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragmentShader, fragmentSource);
+      gl.compileShader(fragmentShader);
+
+      // link the two shaders into a WebGL program
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      this.aPos = gl.getAttribLocation(program, 'a_pos');
+      this.shaderMap.set(shaderDescription.variantName, program);
+
+      return program;
+    },
+
+    // method called when the layer is added to the map
+    // Search for StyleImageInterface in https://maplibre.org/maplibre-gl-js/docs/API/
+    onAdd(map, gl) {
+      // define vertices of the triangle to be rendered in the custom style layer
+      const p1 = maplibregl.MercatorCoordinate.fromLngLat({
+        lng: 125.0,
+        lat: 45.0
+      });
+      const p2 = maplibregl.MercatorCoordinate.fromLngLat({
+        lng: 135.0,
+        lat: 35.0
+      });
+      const p3 = maplibregl.MercatorCoordinate.fromLngLat({
+        lng: 145.0,
+        lat: 55.0
+      });
+
+      // create and initialize a WebGLBuffer to store vertex and color data
+      this.buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+          p1.x, p1.y,
+          p2.x, p2.y,
+          p3.x, p3.y,
+        ]),
+        gl.STATIC_DRAW
+      );
+
+      // Explanation of horizon clipping in MapLibre globe projection:
+      //
+      // When zooming in, the triangle will eventually start doing what at first glance
+      // appears to be clipping the underlying map.
+      //
+      // Instead it is being clipped by the "horizon" plane, which the globe uses to
+      // clip any geometry behind horizon (regular face culling isn't enough).
+      // The horizon plane is not necessarily aligned with the near/far planes.
+      // The clipping is done by assigning a custom value to `gl_Position.z` in the `projectTile`
+      // MapLibre uses a constant z value per layer, so `gl_Position.z` can be anything,
+      // since it later gets overwritten by `glDepthRange`.
+      //
+      // At high zooms, the triangle's three vertices can end up beyond the horizon plane,
+      // resulting in the triangle getting clipped.
+      //
+      // This can be fixed by subdividing the triangle's geometry.
+      // This is in general advisable to do, since without subdivision
+      // geometry would not project to a curved shape under globe projection.
+      // MapLibre also internally subdivides all geometry when globe projection is used.
+    },
+
+    // method fired on each animation frame
+    render(gl, args) {
+      const program = this.getShader(gl, args.shaderData);
+      gl.useProgram(program);
+      gl.uniformMatrix4fv(
+        gl.getUniformLocation(program, 'u_projection_fallback_matrix'),
+        false,
+        args.defaultProjectionData.fallbackMatrix // convert mat4 from gl-matrix to a plain array
+      );
+      gl.uniformMatrix4fv(
+        gl.getUniformLocation(program, 'u_projection_matrix'),
+        false,
+        args.defaultProjectionData.mainMatrix // convert mat4 from gl-matrix to a plain array
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(program, 'u_projection_tile_mercator_coords'),
+        ...args.defaultProjectionData.tileMercatorCoords
+      );
+      gl.uniform4f(
+        gl.getUniformLocation(program, 'u_projection_clipping_plane'),
+        ...args.defaultProjectionData.clippingPlane
+      );
+      gl.uniform1f(
+        gl.getUniformLocation(program, 'u_projection_transition'),
+        args.defaultProjectionData.projectionTransition
+      );
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.enableVertexAttribArray(this.aPos);
+      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+    }
   };
 
   useEffect(() => {
@@ -118,6 +279,9 @@ export const useMap = (options = {}) => {
           }
         });
       }
+
+      // カスタムレイヤー
+      map.current.addLayer(customLayer);
     });
 
     // クリーンアップ
