@@ -55,28 +55,45 @@ export const useMap = (options = {}) => {
             ${shaderDescription.define}
 
             in vec2 a_pos;
+            in vec3 a_color;
+            out vec3 vColor;
 
             void main() {
                 gl_Position = projectTile(a_pos);
+                vColor = a_color;
             }`;
 
       // create GLSL source for fragment shader
       const fragmentSource = `#version 300 es
+            precision mediump float;
 
+            in vec3 vColor;
             out highp vec4 fragColor;
             void main() {
-                fragColor = vec4(1.0, 0.0, 0.0, 0.75);
+                fragColor = vec4(vColor, 0.75);
             }`;
 
       // create a vertex shader
       const vertexShader = gl.createShader(gl.VERTEX_SHADER);
       gl.shaderSource(vertexShader, vertexSource);
       gl.compileShader(vertexShader);
+      {
+        const log = gl.getShaderInfoLog(vertexShader);
+        if (log) {
+          console.error('Vertex shader compile error:', log);
+        }
+      }
 
       // create a fragment shader
       const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
       gl.shaderSource(fragmentShader, fragmentSource);
       gl.compileShader(fragmentShader);
+      {
+        const log = gl.getShaderInfoLog(fragmentShader);
+        if (log) {
+          console.error('Fragment shader compile error:', log);
+        }
+      }
 
       // link the two shaders into a WebGL program
       const program = gl.createProgram();
@@ -85,6 +102,7 @@ export const useMap = (options = {}) => {
       gl.linkProgram(program);
 
       this.aPos = gl.getAttribLocation(program, 'a_pos');
+      this.aColor = gl.getAttribLocation(program, 'a_color');
       this.shaderMap.set(shaderDescription.variantName, program);
 
       return program;
@@ -113,9 +131,10 @@ export const useMap = (options = {}) => {
       gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array([
-          p1.x, p1.y,
-          p2.x, p2.y,
-          p3.x, p3.y,
+          // x, y, r, g, b
+          p1.x, p1.y, 1.0, 0.0, 0.0,
+          p2.x, p2.y, 0.0, 1.0, 0.0,
+          p3.x, p3.y, 0.0, 0.0, 1.0
         ]),
         gl.STATIC_DRAW
       );
@@ -168,9 +187,15 @@ export const useMap = (options = {}) => {
         args.defaultProjectionData.projectionTransition
       );
 
+
+      const stride = (2 + 3) * 4; // float * 5
+
       gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
       gl.enableVertexAttribArray(this.aPos);
-      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, stride, 0);
+      gl.enableVertexAttribArray(this.aColor);
+      gl.vertexAttribPointer(this.aColor, 3, gl.FLOAT, false, stride, 2 * 4);
+
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
