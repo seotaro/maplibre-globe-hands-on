@@ -73,7 +73,7 @@ export const useMap = (options = {}) => {
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
         const log = gl.getShaderInfoLog(shader);
-        if (log) {
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
           console.error('Vertex shader compile error:', log);
         }
         gl.attachShader(program, shader);
