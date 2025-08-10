@@ -5,6 +5,8 @@ import { useMap } from './hooks/useMap';
 // 使用例コンポーネント
 export const Map = () => {
   const { mapContainer, isLoaded } = useMap({
+    center: [140.0, 40.0],
+    zoom: 4,
   });
 
   return (
