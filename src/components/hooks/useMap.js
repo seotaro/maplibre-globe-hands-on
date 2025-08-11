@@ -118,20 +118,20 @@ export const useMap = (options = {}) => {
     onAdd(map, gl) {
       // define vertices of the triangle to be rendered in the custom style layer
       const p1 = maplibregl.MercatorCoordinate.fromLngLat({
-        lng: 125.0,
-        lat: 45.0
+        lng: 150.0,
+        lat: 60.0
       });
       const p2 = maplibregl.MercatorCoordinate.fromLngLat({
-        lng: 135.0,
-        lat: 35.0
+        lng: 150.0,
+        lat: 30.0
       });
       const p3 = maplibregl.MercatorCoordinate.fromLngLat({
-        lng: 145.0,
-        lat: 55.0
+        lng: 170.0,
+        lat: 60.0
       });
       const p4 = maplibregl.MercatorCoordinate.fromLngLat({
-        lng: 155.0,
-        lat: 45.0
+        lng: 170.0,
+        lat: 30.0
       });
 
       // create and initialize a WebGLBuffer to store vertex and color data
